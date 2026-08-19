@@ -1,0 +1,12 @@
+{
+  "woongzip1/universr-audio": {
+    "status": "READY",
+    "repo_id": "woongzip1/universr-audio",
+    "alias": "audio_48k_general",
+    "type": "general",
+    "precision": "fp32",
+    "local_path": "weights\\universr-audio",
+    "description": "Vocoder-Free General Broadband Music Super-Resolution",
+    "is_default": true
+  }
+}
