@@ -37,6 +37,7 @@ from furgie_core.dsp_cuda import measure_true_peak_linear
 
 DEFAULT_MODEL_REPO = "woongzip1/universr-audio"
 
+
 class FurgieEngine:
     def __init__(
         self,
@@ -99,8 +100,8 @@ class FurgieEngine:
                 "enabled": True,
                 "repo_id": "woongzip1/universr-audio",
                 "solver": "midpoint",
-                "ode_steps": 8,
-                "guidance_scale": 1.4,
+                "ode_steps": 16,
+                "guidance_scale": 0.0,
                 "input_sr_anchor": 24000,
             },
         }
@@ -110,7 +111,6 @@ class FurgieEngine:
     def _resolve_weight_directory(self, repo_id: str) -> Path:
         if self.custom_weights_dir and self.custom_weights_dir.exists():
             return self.custom_weights_dir
-
         if MANIFEST_FILE.exists():
             try:
                 with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
@@ -128,10 +128,8 @@ class FurgieEngine:
         repo_subfolder = WEIGHTS_DIR / repo_id.split("/")[-1]
         if repo_subfolder.exists():
             return repo_subfolder
-
         if LOCAL_CACHE_DIR.exists():
             return LOCAL_CACHE_DIR
-
         return repo_subfolder
 
     def _get_resampler(self, orig_sr: int, new_sr: int) -> torchaudio.transforms.Resample:
@@ -195,7 +193,6 @@ class FurgieEngine:
         target_linear = 10.0 ** (req.target_peak_dbfs / 20.0)
 
         tp_48k = measure_true_peak_linear(restored_48k, sample_rate=self.target_sr)
-
         if mode_headroom == "peak_resistant":
             t_eff_48k = max(target_linear, in_tp_lin)
             gain_48k = float(min(1.0, t_eff_48k / max(tp_48k, 1e-9)))
@@ -296,6 +293,7 @@ class FurgieEngine:
             tp_dbtp_44 = 20.0 * np.log10(max(final_tp_44k1, 1e-9))
             rms_val_44 = float(np.sqrt(np.mean(master_44k1_data ** 2)))
             rms_dbfs_44 = 20.0 * np.log10(max(rms_val_44, 1e-9))
+
             peak_linear_44k1 = p_lin_44
             peak_dbfs_44k1 = p_dbfs_44
             true_peak_linear_44k1 = final_tp_44k1
@@ -360,9 +358,9 @@ class FurgieEngine:
             target_rate=target_rate,
             headroom_mode=headroom_mode,
             target_peak_dbfs=target_peak_dbfs,
-            ode_steps=ode_steps if ode_steps is not None else 8,
+            ode_steps=ode_steps if ode_steps is not None else 16,
             solver=solver if solver is not None else "midpoint",
-            guidance_scale=guidance_scale if guidance_scale is not None else 1.4,
+            guidance_scale=guidance_scale if guidance_scale is not None else 0.0,
             input_sr_anchor=input_sr_anchor if input_sr_anchor is not None else 24000,
             device=str(self.device),
             repo_id=self.current_model_repo,

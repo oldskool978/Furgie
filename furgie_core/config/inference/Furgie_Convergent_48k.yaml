@@ -2,12 +2,14 @@ model_metadata:
   name: Furgie-Convergent-48K
   version: 2.0.0
   description: Filterless Complex STFT Generative Super-Resolution Engine.
+
 audio:
   target_sample_rate: 48000
   n_fft: 1024
   hop_length: 512
   win_length: 1024
   power_alpha: 0.2
+
 model:
   dims: [96, 192, 384, 768]
   depths: [2, 2, 4, 2]
@@ -21,10 +23,11 @@ model:
     12: 128
     16: 170
     24: 256
+
 universr_flow_core:
   enabled: true
   repo_id: woongzip1/universr-audio
   solver: midpoint
-  ode_steps: 8
-  guidance_scale: 1.4
+  ode_steps: 16
+  guidance_scale: 0.0
   input_sr_anchor: 24000

@@ -7,10 +7,12 @@ import numpy as np
 from pathlib import Path
 from typing import Optional, Union, Callable
 from safetensors.torch import save_file as save_safetensors
+
 from furgie_core.dsp_cuda import generate_c_infinite_ola_window
 from furgie_core.arch.model import UniverSRModel
 
 VALID_UNIVERSR_SRS = [8000, 12000, 16000, 24000]
+
 
 class UniverSRWrapper(nn.Module):
     def __init__(self, config_path: Path, weight_dir: Path):
@@ -20,10 +22,12 @@ class UniverSRWrapper(nn.Module):
 
         audio_cfg = self.cfg.get("audio", {})
         flow_cfg = self.cfg.get("universr_flow_core", {})
+
         self.target_sr = audio_cfg.get("target_sample_rate", 48000)
-        self.ode_steps = flow_cfg.get("ode_steps", 8)
+        self.ode_steps = flow_cfg.get("ode_steps", 16)
         self.solver = flow_cfg.get("solver", "midpoint")
-        self.guidance_scale = flow_cfg.get("guidance_scale", 1.4)
+        self.guidance_scale = flow_cfg.get("guidance_scale", 0.0)
+
         self.weight_dir = Path(weight_dir)
         self.model: Optional[UniverSRModel] = None
         self._is_loaded = False
@@ -34,11 +38,13 @@ class UniverSRWrapper(nn.Module):
             state_dict = torch.load(str(bin_path), map_location="cpu", weights_only=True)
         except Exception:
             state_dict = torch.load(str(bin_path), map_location="cpu", weights_only=False)
+
         if isinstance(state_dict, dict):
             for k in ["state_dict", "model", "net", "model_state_dict"]:
                 if k in state_dict and isinstance(state_dict[k], dict):
                     state_dict = state_dict[k]
                     break
+
         clean_sd = {k: v.contiguous() for k, v in state_dict.items() if isinstance(v, torch.Tensor)}
         sf_path.parent.mkdir(parents=True, exist_ok=True)
         save_safetensors(clean_sd, str(sf_path))
@@ -94,7 +100,7 @@ class UniverSRWrapper(nn.Module):
     ) -> torch.Tensor:
         channels, total_samples = wav_tensor.shape
         pad_len = min(int(0.200 * self.target_sr), max(0, total_samples - 1))
-        
+
         chunk_len = 261120
         overlap_len = 30720
         stride_len = chunk_len - overlap_len
@@ -117,6 +123,7 @@ class UniverSRWrapper(nn.Module):
         total_tiles = len(starts)
         output_acc = torch.zeros((channels, padded_samples), dtype=torch.float32, device=self.device)
         weight_acc = torch.zeros((1, padded_samples), dtype=torch.float32, device=self.device)
+
         window = generate_c_infinite_ola_window(
             chunk_len=chunk_len, overlap_len=overlap_len, device=self.device
         )
@@ -147,6 +154,7 @@ class UniverSRWrapper(nn.Module):
 
         weight_acc = torch.clamp(weight_acc, min=1e-6)
         final_padded = output_acc / weight_acc
+
         return final_padded[:, pad_len : pad_len + total_samples]
 
     @torch.inference_mode()
@@ -164,6 +172,7 @@ class UniverSRWrapper(nn.Module):
 
         audio_tensor = self._load_audio_tensor(audio_input)
         mapped_input_sr = min(VALID_UNIVERSR_SRS, key=lambda s: abs(s - input_sr))
+
         steps = ode_steps if ode_steps is not None else self.ode_steps
         solve_method = solver if solver is not None else self.solver
         cfg_scale = guidance_scale if guidance_scale is not None else self.guidance_scale

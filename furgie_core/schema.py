@@ -7,6 +7,7 @@ SUPPORTED_SOLVERS = ["midpoint", "euler"]
 SUPPORTED_TARGET_RATES = ["48k", "44.1k", "both"]
 SUPPORTED_HEADROOM_MODES = ["bypass", "peak_resistant", "strict_ceiling"]
 
+
 @dataclass
 class FurgieRequest:
     input_path: Optional[str] = None
@@ -16,9 +17,9 @@ class FurgieRequest:
     target_rate: str = "48k"
     headroom_mode: str = "bypass"
     target_peak_dbfs: float = 0.0
-    ode_steps: int = 8
+    ode_steps: int = 16
     solver: str = "midpoint"
-    guidance_scale: float = 1.4
+    guidance_scale: float = 0.0
     device: str = "cuda"
     repo_id: str = "woongzip1/universr-audio"
 
@@ -32,6 +33,7 @@ class FurgieRequest:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return cls(**data)
+
 
 @dataclass
 class FurgieTelemetry:

@@ -3,14 +3,17 @@ from typing import Dict, Any, Tuple
 import torch
 import torch.nn as nn
 from safetensors.torch import load_file as load_safetensors
+
 from furgie_core.arch.universr import UniverSRBackbone
 from furgie_core.arch.solver import FlowMatchingODESolver
 from furgie_core.arch.spectral_ops import forward_stft, inverse_stft
+
 
 class UniverSRModel(nn.Module):
     def __init__(self, config: Dict[str, Any]):
         super().__init__()
         self.config = config
+
         audio_cfg = config.get("audio", config.get("transform", {}))
         self.target_sr = audio_cfg.get("target_sample_rate", audio_cfg.get("sampling_rate", 48000))
         self.n_fft = audio_cfg.get("n_fft", 1024)
@@ -30,6 +33,7 @@ class UniverSRModel(nn.Module):
             "feature_enc_layers": model_cfg.get("feature_enc_layers", 4),
             "sr_to_lr_bins": model_cfg.get("sr_to_lr_bins", {8: 80, 12: 128, 16: 170, 24: 256}),
         }
+
         self.backbone = UniverSRBackbone(**arch_kwargs)
         self.sr_to_lr_bins = arch_kwargs["sr_to_lr_bins"]
         self.hr_freq_bins = arch_kwargs["hr_freq_bins"]
@@ -70,8 +74,8 @@ class UniverSRModel(nn.Module):
         waveform: torch.Tensor,
         input_sr: int = 24000,
         ode_method: str = "midpoint",
-        ode_steps: int = 8,
-        guidance_scale: float = 1.4,
+        ode_steps: int = 16,
+        guidance_scale: float = 0.0,
     ) -> torch.Tensor:
         orig_device = waveform.device
         orig_len = waveform.shape[-1]
@@ -102,8 +106,8 @@ class UniverSRModel(nn.Module):
         Y_hr = Y[:, :, hf_start_bin:, :]
 
         x_0 = torch.randn_like(Y_hr, device=orig_device, dtype=self.model_dtype)
-
         w = guidance_scale
+
         sr_proj_c, spatial_cond_c = self.backbone.precompute_spatial_conditioning(
             y_lr=Y_lr, sr_khz=sr_khz, batch_size=b_sz, time_steps=t_frames, is_unconditional=False
         )
@@ -121,6 +125,7 @@ class UniverSRModel(nn.Module):
         def guided_velocity_field(x_current: torch.Tensor, t_current: torch.Tensor) -> torch.Tensor:
             x_in = x_current.to(dtype=self.model_dtype)
             t_in = t_current.to(dtype=self.model_dtype)
+
             if w > 1.0:
                 x_in_dual = torch.cat([x_in, x_in], dim=0)
                 t_in_dual = torch.cat([t_in, t_in], dim=0)

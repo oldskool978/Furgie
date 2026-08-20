@@ -35,6 +35,7 @@ from furgie_core.engine import FurgieEngine
 
 console = Console()
 
+
 def print_telemetry(resp: FurgieTelemetry) -> None:
     print("\n" + "=" * 84)
     print("                        ACOUSTIC TELEMETRY REPORT")
@@ -61,6 +62,7 @@ def print_telemetry(resp: FurgieTelemetry) -> None:
     print(f"Acoustic Crest Factor:   {resp.crest_factor_db:.2f} dB")
     gain_db = 20.0 * torch.log10(torch.tensor(max(resp.master_gain_scalar, 1e-9))).item()
     print(f"Master LTI Gain Scalar:  {resp.master_gain_scalar:.6f} ({gain_db:.2f} dB)")
+
     if resp.output_44k1_path and resp.peak_linear_44k1 is not None:
         print(" --- [44.1 kHz POLYPHASE MASTER DYNAMICS] ---")
         print(f"Signal Dynamics (Peak):  {resp.peak_linear_44k1:.6f} ({resp.peak_dbfs_44k1:.2f} dBFS)")
@@ -70,6 +72,7 @@ def print_telemetry(resp: FurgieTelemetry) -> None:
         gain_db_44 = 20.0 * torch.log10(torch.tensor(max(resp.master_gain_scalar_44k1, 1e-9))).item()
         print(f"Master LTI Gain Scalar:  {resp.master_gain_scalar_44k1:.6f} ({gain_db_44:.2f} dB)")
     print("=" * 84 + "\n")
+
 
 def list_workspace_files(workspace_dir: Path) -> List[Path]:
     audio_extensions = {".wav", ".flac", ".mp3", ".ogg", ".m4a", ".aiff", ".alac"}
@@ -84,10 +87,11 @@ def list_workspace_files(workspace_dir: Path) -> List[Path]:
                 files.append(item)
     return sorted(files, key=lambda x: str(x.relative_to(workspace_dir)))
 
+
 def display_menu(req: FurgieRequest) -> None:
     headroom_labels = {
         "bypass": "BYPASS (Passband Bit-Exact Unity 1.0x)",
-        "peak_resistant": f"PEAK RESISTANCE™ (max({req.target_peak_dbfs:.1f} dBTP, TP_in) Ceiling)",
+        "peak_resistant": f"PEAK RESISTANCE  (max({req.target_peak_dbfs:.1f} dBTP, TP_in) Ceiling)",
         "strict_ceiling": f"STRICT CEILING ({req.target_peak_dbfs:.1f} dBTP Absolute Cap)",
     }
     target_labels = {
@@ -95,6 +99,7 @@ def display_menu(req: FurgieRequest) -> None:
         "44.1k": "44.1 kHz Master Only (Polyphase Decimated)",
         "both": "Dual Master (48.0 kHz + 44.1 kHz Independent Scalers)",
     }
+
     print("\n" + "=" * 84)
     print("        FURGIE V2 OPTIMAL TRANSPORT FLOW-MATCHING HARNESS")
     print("=" * 84)
@@ -111,20 +116,19 @@ def display_menu(req: FurgieRequest) -> None:
     print(" --- [STAGE 3: COMPUTE HARDWARE] ---")
     print(f" [8]  Target Device:             {req.device.upper()}")
     print("-" * 84)
-    print(" [9]  Preset: Convergent Master  (Midpoint 8-Step, CFG 1.4, 24k Anchor, Bypass)")
-    print(" [10] Preset: Archival Polish    (Midpoint 16-Step, CFG 1.5, 24k Anchor, Bypass)")
-    print(" [11] Preset: Fast Exploration   (Midpoint 4-Step, CFG 1.3, 24k Anchor, Bypass)")
-    print("-" * 84)
     print(" [L] Load Preset (JSON)   [S] Save Preset (JSON)")
     print(" [G] Generate Audio       [Q] Quit")
     print("=" * 84)
 
+
 def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) -> None:
     workspace_dir = ROOT_DIR / "workspace"
     workspace_dir.mkdir(parents=True, exist_ok=True)
+
     while True:
         display_menu(req)
         choice = input("Select option to mutate: ").strip().upper()
+
         if choice == "1":
             files = list_workspace_files(workspace_dir)
             if files:
@@ -148,13 +152,16 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
                         req.input_path = str(p.resolve())
                     else:
                         print(f"[ERROR] File not found: {p_in}")
+
         elif choice == "2":
             o = input(f"Enter Output WAV Destination [{req.output_path}]: ").strip().strip('"').strip("'")
             if o:
                 req.output_path = o
+
         elif choice == "3":
             cycle = {"48k": "44.1k", "44.1k": "both", "both": "48k"}
             req.target_rate = cycle.get(req.target_rate, "48k")
+
         elif choice == "4":
             print("\n[1] MIDPOINT (2nd-Order Midpoint RK2)  [2] EULER (1st-Order Forward)")
             s_sel = input(f"Select Solver [{req.solver}]: ").strip()
@@ -162,6 +169,7 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
                 req.solver = "midpoint"
             elif s_sel in ["2", "euler"]:
                 req.solver = "euler"
+
         elif choice == "5":
             s_val = input(f"Enter ODE Integration Steps [{req.ode_steps}]: ").strip()
             if s_val.isdigit() and int(s_val) >= 1:
@@ -169,14 +177,16 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
             c_val = input(f"Enter CFG Guidance Scale [{req.guidance_scale:.2f}]: ").strip()
             if c_val:
                 req.guidance_scale = float(c_val)
+
         elif choice == "6":
             print("\n[1] 24 kHz (Standard 12kHz Nyquist Anchor)  [2] 16 kHz  [3] 12 kHz  [4] 8 kHz")
             a_sel = input("Select Pretrained Anchor [1]: ").strip()
             a_map = {"1": 24000, "2": 16000, "3": 12000, "4": 8000}
             req.input_sr_anchor = a_map.get(a_sel, req.input_sr_anchor)
+
         elif choice == "7":
             print("\n[1] BYPASS (Exact 1.0x Passband Unity Master)")
-            print("[2] PEAK RESISTANCE™ (Input-Aware Relative Headroom)")
+            print("[2] PEAK RESISTANCE  (Input-Aware Relative Headroom)")
             print("[3] STRICT CEILING (Absolute True-Peak Ceiling)")
             h_sel = input(f"Select Headroom Mode [{req.headroom_mode}]: ").strip()
             if h_sel in ["1", "bypass"]:
@@ -191,32 +201,10 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
                 val = input(f"Enter Target Peak dBTP Ceiling [-1.0 to 0.0] [{req.target_peak_dbfs:.1f}]: ").strip()
                 if val:
                     req.target_peak_dbfs = float(val)
+
         elif choice == "8":
             req.device = "cpu" if req.device == "cuda" else ("cuda" if torch.cuda.is_available() else "cpu")
-        elif choice == "9":
-            req.solver = "midpoint"
-            req.ode_steps = 8
-            req.guidance_scale = 1.4
-            req.input_sr_anchor = 24000
-            req.headroom_mode = "bypass"
-            req.target_peak_dbfs = 0.0
-            print("\n[Preset Applied: Convergent Music Master]")
-        elif choice == "10":
-            req.solver = "midpoint"
-            req.ode_steps = 16
-            req.guidance_scale = 1.5
-            req.input_sr_anchor = 24000
-            req.headroom_mode = "bypass"
-            req.target_peak_dbfs = 0.0
-            print("\n[Preset Applied: Archival Polish]")
-        elif choice == "11":
-            req.solver = "midpoint"
-            req.ode_steps = 4
-            req.guidance_scale = 1.3
-            req.input_sr_anchor = 24000
-            req.headroom_mode = "bypass"
-            req.target_peak_dbfs = 0.0
-            print("\n[Preset Applied: Fast Exploration]")
+
         elif choice == "L":
             p_path = input("Enter JSON preset path to load: ").strip().strip('"').strip("'")
             try:
@@ -224,6 +212,7 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
                 print(f"Preset loaded successfully from {p_path}")
             except Exception as e:
                 print(f"Preset load error: {e}")
+
         elif choice == "S":
             p_path = input("Enter destination JSON preset path: ").strip().strip('"').strip("'")
             try:
@@ -231,13 +220,16 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
                 print(f"Preset saved successfully to {p_path}")
             except Exception as e:
                 print(f"Preset save error: {e}")
+
         elif choice == "G":
             if not req.input_path or not Path(req.input_path).exists():
                 print("\n[bold red][ERROR] Please configure a valid input audio file first (Option [1]).[/bold red]")
                 continue
+
             if engine is None:
                 print(f"\nInitializing neural engine on {req.device.upper()}...")
                 engine = FurgieEngine(device=req.device, model_repo_id=req.repo_id)
+
             print(f"\nExecuting Super-Resolution Pass ({Path(req.input_path).name} -> {Path(req.output_path).name})...")
             try:
                 with Progress(
@@ -249,6 +241,7 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
                     console=console,
                 ) as progress:
                     task = progress.add_task("[cyan]Flow Matching Complex STFT Inpainting...", total=100)
+
                     def update_progress(current_tile: int, total_tiles: int) -> None:
                         pct = int((current_tile / total_tiles) * 100)
                         progress.update(
@@ -256,13 +249,16 @@ def run_interactive_harness(engine: Optional[FurgieEngine], req: FurgieRequest) 
                             completed=pct,
                             description=f"[cyan]Tile [{current_tile}/{total_tiles}] STFT Inpainting...",
                         )
+
                     telemetry = engine.synthesize_request(req, tile_progress_callback=update_progress)
                 print_telemetry(telemetry)
             except Exception as e:
                 print(f"Synthesis failed: {e}", file=sys.stderr)
                 traceback.print_exc()
+
         elif choice == "Q":
             sys.exit(0)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Pure Neural Flow-Matching Super-Resolution Harness.")
@@ -292,9 +288,11 @@ def main() -> None:
     parser.add_argument("--load-preset", type=str, default=None)
     parser.add_argument("--save-preset", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
+
     args = parser.parse_args()
 
     req = FurgieRequest.load_preset(Path(args.load_preset)) if args.load_preset else FurgieRequest()
+
     if args.input is not None:
         req.input_path = str(Path(args.input).resolve())
     if args.output is not None:
@@ -330,6 +328,7 @@ def main() -> None:
         engine = FurgieEngine(device=req.device, model_repo_id=req.repo_id)
         telemetry = engine.synthesize_request(req)
         print_telemetry(telemetry)
+
 
 if __name__ == "__main__":
     try:
