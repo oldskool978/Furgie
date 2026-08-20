@@ -21,7 +21,7 @@ class FurgieRequest:
     solver: str = "midpoint"
     guidance_scale: float = 0.0
     device: str = "cuda"
-    repo_id: str = "woongzip1/universr-audio"
+    repo_id: str = "OLDSKOOL978/universr-audio"
 
     def save_preset(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

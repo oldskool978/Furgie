@@ -6,7 +6,6 @@ import soundfile as sf
 import numpy as np
 from pathlib import Path
 from typing import Optional, Union, Callable
-from safetensors.torch import save_file as save_safetensors
 
 from furgie_core.dsp_cuda import generate_c_infinite_ola_window
 from furgie_core.arch.model import UniverSRModel
@@ -33,30 +32,10 @@ class UniverSRWrapper(nn.Module):
         self._is_loaded = False
         self.device = torch.device("cpu")
 
-    def _convert_bin_to_safetensors(self, bin_path: Path, sf_path: Path) -> None:
-        try:
-            state_dict = torch.load(str(bin_path), map_location="cpu", weights_only=True)
-        except Exception:
-            state_dict = torch.load(str(bin_path), map_location="cpu", weights_only=False)
-
-        if isinstance(state_dict, dict):
-            for k in ["state_dict", "model", "net", "model_state_dict"]:
-                if k in state_dict and isinstance(state_dict[k], dict):
-                    state_dict = state_dict[k]
-                    break
-
-        clean_sd = {k: v.contiguous() for k, v in state_dict.items() if isinstance(v, torch.Tensor)}
-        sf_path.parent.mkdir(parents=True, exist_ok=True)
-        save_safetensors(clean_sd, str(sf_path))
-
-    def load_weights(self, device: torch.device, model_repo_id: str = "woongzip1/universr-audio") -> None:
+    def load_weights(self, device: torch.device, model_repo_id: str = "OLDSKOOL978/universr-audio") -> None:
         self.device = device
         sf_path = self.weight_dir / "model.safetensors"
-        bin_path = self.weight_dir / "pytorch_model.bin"
         cfg_path = self.weight_dir / "config.yaml"
-
-        if not sf_path.exists() and bin_path.exists():
-            self._convert_bin_to_safetensors(bin_path, sf_path)
 
         if cfg_path.exists():
             with open(cfg_path, "r", encoding="utf-8") as f:

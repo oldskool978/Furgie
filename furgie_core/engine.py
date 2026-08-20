@@ -35,7 +35,7 @@ from furgie_core.schema import (
 )
 from furgie_core.dsp_cuda import measure_true_peak_linear
 
-DEFAULT_MODEL_REPO = "woongzip1/universr-audio"
+DEFAULT_MODEL_REPO = "OLDSKOOL978/universr-audio"
 
 
 class FurgieEngine:
@@ -98,7 +98,7 @@ class FurgieEngine:
             },
             "universr_flow_core": {
                 "enabled": True,
-                "repo_id": "woongzip1/universr-audio",
+                "repo_id": "OLDSKOOL978/universr-audio",
                 "solver": "midpoint",
                 "ode_steps": 16,
                 "guidance_scale": 0.0,

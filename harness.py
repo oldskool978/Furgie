@@ -55,22 +55,22 @@ def print_telemetry(resp: FurgieTelemetry) -> None:
     print(" --- [INPUT SOURCE DYNAMICS] ---")
     print(f"Input Sample Peak:       {resp.input_peak_linear:.6f} ({resp.input_peak_dbfs:.2f} dBFS)")
     print(f"Input True Peak (4x):    {resp.input_true_peak_linear:.6f} ({resp.input_true_peak_dbtp:.2f} dBTP)")
-    print(" --- [PRIMARY MASTER DYNAMICS] ---")
+    print(" --- [PRIMARY RESTORATION DYNAMICS] ---")
     print(f"Signal Dynamics (Peak):  {resp.peak_linear:.6f} ({resp.peak_dbfs:.2f} dBFS)")
     print(f"True Peak (4x Sinc):     {resp.true_peak_linear:.6f} ({resp.true_peak_dbtp:.2f} dBTP)")
     print(f"Signal Dynamics (RMS):   {resp.rms_dbfs:.2f} dBFS")
     print(f"Acoustic Crest Factor:   {resp.crest_factor_db:.2f} dB")
     gain_db = 20.0 * torch.log10(torch.tensor(max(resp.master_gain_scalar, 1e-9))).item()
-    print(f"Master LTI Gain Scalar:  {resp.master_gain_scalar:.6f} ({gain_db:.2f} dB)")
+    print(f"Linear Gain Scalar:      {resp.master_gain_scalar:.6f} ({gain_db:.2f} dB)")
 
     if resp.output_44k1_path and resp.peak_linear_44k1 is not None:
-        print(" --- [44.1 kHz POLYPHASE MASTER DYNAMICS] ---")
+        print(" --- [44.1 kHz POLYPHASE RESTORATION DYNAMICS] ---")
         print(f"Signal Dynamics (Peak):  {resp.peak_linear_44k1:.6f} ({resp.peak_dbfs_44k1:.2f} dBFS)")
         print(f"True Peak (4x Sinc):     {resp.true_peak_linear_44k1:.6f} ({resp.true_peak_dbtp_44k1:.2f} dBTP)")
         print(f"Signal Dynamics (RMS):   {resp.rms_dbfs_44k1:.2f} dBFS")
         print(f"Acoustic Crest Factor:   {resp.crest_factor_db_44k1:.2f} dB")
         gain_db_44 = 20.0 * torch.log10(torch.tensor(max(resp.master_gain_scalar_44k1, 1e-9))).item()
-        print(f"Master LTI Gain Scalar:  {resp.master_gain_scalar_44k1:.6f} ({gain_db_44:.2f} dB)")
+        print(f"Linear Gain Scalar:      {resp.master_gain_scalar_44k1:.6f} ({gain_db_44:.2f} dB)")
     print("=" * 84 + "\n")
 
 
@@ -101,11 +101,11 @@ def display_menu(req: FurgieRequest) -> None:
     }
 
     print("\n" + "=" * 84)
-    print("        FURGIE V2 OPTIMAL TRANSPORT FLOW-MATCHING HARNESS")
+    print("      FURGIE V2 OPTIMAL TRANSPORT AUDIO SUPER-RESOLUTION HARNESS")
     print("=" * 84)
     print(" --- [I/O & TARGET SAMPLING RESOLUTION] ---")
     print(f" [1]  Input Audio Path:          {req.input_path if req.input_path else '<Select from workspace/ or enter path>'}")
-    print(f" [2]  Output Master WAV:         {req.output_path}")
+    print(f" [2]  Output WAV Destination:    {req.output_path}")
     print(f" [3]  Target Delivery Mode:      {target_labels.get(req.target_rate, req.target_rate)}")
     print(" --- [STAGE 1: DETERMINISTIC CONTINUOUS FLOW ODE] ---")
     print(f" [4]  Flow ODE Solver:           {req.solver.upper()} ({'2nd-Order Midpoint RK2' if req.solver == 'midpoint' else '1st-Order Euler'})")

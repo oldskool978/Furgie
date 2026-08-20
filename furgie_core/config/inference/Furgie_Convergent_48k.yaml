@@ -26,7 +26,7 @@ model:
 
 universr_flow_core:
   enabled: true
-  repo_id: woongzip1/universr-audio
+  repo_id: OLDSKOOL978/universr-audio
   solver: midpoint
   ode_steps: 16
   guidance_scale: 0.0

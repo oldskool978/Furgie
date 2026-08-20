@@ -1,9 +1,9 @@
-# scripts/hydrate_models.py
 import argparse
 import json
 import math
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+
 import torch
 import torch.nn.functional as F
 from rich.console import Console
@@ -22,10 +22,10 @@ WEIGHTS_DIR = PROJECT_ROOT / "weights"
 MANIFEST_PATH = PROJECT_ROOT / "scripts" / "hydrated_models_manifest.json"
 
 MODEL_REGISTRY = {
-    "woongzip1/universr-audio": {
+    "OLDSKOOL978/universr-audio": {
         "alias": "audio_48k_general",
         "type": "general",
-        "description": "Vocoder-Free General Broadband Music Super-Resolution",
+        "description": "Vocoder-Free General Broadband Audio Super-Resolution",
         "local_dir": WEIGHTS_DIR / "universr-audio",
         "required_files": ["model.safetensors", "config.yaml"],
         "is_default": True,
@@ -61,7 +61,6 @@ class GorillaJackWeightRefinery:
                 - 0.5
             )
             self._bayer_cache = bayer_8x8
-
         C, num_blocks, block_size = shape
         total_len = C * num_blocks * block_size
         flat = self._bayer_cache.view(-1).repeat((total_len // 64) + 1)[:total_len]
@@ -72,10 +71,8 @@ class GorillaJackWeightRefinery:
         orig_shape = tensor_fp32.shape
         orig_device = tensor_fp32.device
         t_work = tensor_fp32.to(self.device).float()
-
         if t_work.numel() < block_size:
             return t_work.to(torch.float16).to(orig_device)
-
         if t_work.ndim >= 2:
             C = t_work.shape[0]
             flat_channels = t_work.reshape(C, -1)
@@ -93,8 +90,8 @@ class GorillaJackWeightRefinery:
 
         num_blocks = t_centered.shape[1] // block_size
         t_blocked = t_centered.reshape(C, num_blocks, block_size)
-
         bayer = self._get_bayer_block((C, num_blocks, block_size))
+
         error_state = torch.zeros((C, num_blocks), device=self.device, dtype=torch.float32)
         out_blocked = torch.empty_like(t_blocked)
 
@@ -104,27 +101,21 @@ class GorillaJackWeightRefinery:
         for i in range(block_size):
             y = t_blocked[:, :, i]
             z = y + error_state
-
             z_q = z.to(torch.float16)
             z_near = z_q.float()
             z_low = torch.nextafter(z_q, t_neg_inf).float()
             z_high = torch.nextafter(z_q, t_inf).float()
-
             is_above = y > z_near
             s_low = torch.where(is_above, z_near, z_low)
             s_high = torch.where(is_above, z_high, z_near)
-
             step = torch.clamp(s_high - s_low, min=1e-12)
             max_err = step * 0.5
-
             curr_err = (y - z_near).abs()
             err_ratio = torch.clamp(curr_err / max_err, 0.0, 1.0)
             grace = 0.5 * (err_ratio.pow(2.0) + (1.0 - torch.cos(err_ratio * self.PI_BY_2)))
             nudge = bayer[:, :, i] * max_err * grace
-
             z_final = z + nudge
             q = torch.clamp(z_final, s_low, s_high).to(torch.float16).float()
-
             out_blocked[:, :, i] = q
             error_state = torch.clamp(z_final - q, -1.0, 1.0)
 
@@ -133,69 +124,31 @@ class GorillaJackWeightRefinery:
         return restored.to(orig_device)
 
 
-def convert_bin_to_safetensors(target_dir: Path, precision: str = "fp32") -> bool:
-    bin_path = target_dir / "pytorch_model.bin"
+def refine_safetensors_fp16(target_dir: Path) -> bool:
     sf_path = target_dir / "model.safetensors"
-    if not bin_path.exists():
+    if not sf_path.exists():
         return False
     try:
-        is_fp16 = precision.lower() in ("fp16", "half")
-        target_dtype = torch.float16 if is_fp16 else torch.float32
-
-        if is_fp16:
-            console.print("   [cyan]Refining weights via Gorilla-Jack Dithered Quantization (FP16)...[/cyan]")
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            refinery = GorillaJackWeightRefinery(device=device)
-        else:
-            console.print("   [yellow]Serializing weights directly to Native Master FP32 (Full Precision)...[/yellow]")
-            refinery = None
-
-        try:
-            sd = torch.load(str(bin_path), map_location="cpu", weights_only=True)
-        except Exception:
-            sd = torch.load(str(bin_path), map_location="cpu", weights_only=False)
-
-        if isinstance(sd, dict):
-            for k in ["state_dict", "model", "net"]:
-                if k in sd and isinstance(sd[k], dict):
-                    sd = sd[k]
-                    break
-
+        console.print("   [cyan]Refining weights via Gorilla-Jack Dithered Quantization (FP16)...[/cyan]")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        refinery = GorillaJackWeightRefinery(device=device)
+        sd = load_safetensors(str(sf_path), device="cpu")
         clean_sd = {}
         for k, v in sd.items():
-            if isinstance(v, torch.Tensor):
-                if v.is_floating_point():
-                    if is_fp16 and refinery is not None:
-                        clean_sd[k] = refinery.quantize_fp16(v).contiguous()
-                    else:
-                        clean_sd[k] = v.to(target_dtype).contiguous()
-                else:
-                    clean_sd[k] = v.contiguous()
-
+            if isinstance(v, torch.Tensor) and v.is_floating_point():
+                clean_sd[k] = refinery.quantize_fp16(v).contiguous()
+            else:
+                clean_sd[k] = v.contiguous()
         save_safetensors(clean_sd, str(sf_path))
-        test_sd = load_safetensors(str(sf_path), device="cpu")
-        if len(test_sd) == len(clean_sd) and sf_path.stat().st_size > 0:
-            console.print(f"   [bold green]Serialization verified successfully ({target_dtype}).[/bold green]")
-            return True
-        else:
-            raise RuntimeError("SafeTensors verification mismatch post-serialization.")
+        return True
     except Exception as e:
-        console.print(f"   [bold red]Conversion failure: {e}[/bold red]")
+        console.print(f"   [bold red]Quantization failure: {e}[/bold red]")
         return False
 
 
-def verify_model_integrity(target_dir: Path, required_files: list, precision: str = "fp32", force: bool = False) -> bool:
+def verify_model_integrity(target_dir: Path, required_files: list) -> bool:
     if not target_dir.exists():
         return False
-    sf_path = target_dir / "model.safetensors"
-    bin_path = target_dir / "pytorch_model.bin"
-
-    if force or (not sf_path.exists() and bin_path.exists()):
-        if bin_path.exists():
-            convert_bin_to_safetensors(target_dir, precision=precision)
-        else:
-            return False
-
     for filename in required_files:
         file_path = target_dir / filename
         if not file_path.exists() or file_path.stat().st_size == 0:
@@ -208,7 +161,7 @@ def hydrate_model(repo_id: str, meta: Dict[str, Any], precision: str = "fp32", f
     target_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"\nHydrating Target Repository: [cyan]{repo_id}[/cyan]")
 
-    if not force and verify_model_integrity(target_dir, meta["required_files"], precision=precision, force=False):
+    if not force and verify_model_integrity(target_dir, meta["required_files"]):
         console.print("[bold green]Local SafeTensors weights verified intact. Skipping acquisition.[/bold green]")
         return {
             "status": "READY",
@@ -220,6 +173,7 @@ def hydrate_model(repo_id: str, meta: Dict[str, Any], precision: str = "fp32", f
             "description": meta["description"],
             "is_default": meta["is_default"],
         }
+
     try:
         snapshot_download(
             repo_id=repo_id,
@@ -227,9 +181,11 @@ def hydrate_model(repo_id: str, meta: Dict[str, Any], precision: str = "fp32", f
             local_dir_use_symlinks=False,
             resume_download=True,
         )
-        convert_bin_to_safetensors(target_dir, precision=precision)
-        if verify_model_integrity(target_dir, meta["required_files"], precision=precision, force=False):
-            console.print("[bold green]Download and SafeTensors serialization complete.[/bold green]")
+        if precision.lower() in ("fp16", "half"):
+            refine_safetensors_fp16(target_dir)
+
+        if verify_model_integrity(target_dir, meta["required_files"]):
+            console.print("[bold green]Download and SafeTensors verification complete.[/bold green]")
             return {
                 "status": "READY",
                 "repo_id": repo_id,
@@ -259,13 +215,13 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Force re-conversion and overwrite existing model.safetensors",
+        help="Force re-download and verification of model weights",
     )
     args = parser.parse_args()
 
     panel = Panel(
-        "[bold cyan]Furgie Music Super-Resolution SafeTensors Hydrator[/bold cyan]\n"
-        "[bold gold1]Precision-Selectable Serialization Engine :: universr-audio[/bold gold1]",
+        "[bold cyan]Furgie Pure SafeTensors Hydrator[/bold cyan]\n"
+        "[bold gold1]Native Precision Serialization Engine :: universr-audio[/bold gold1]",
         expand=False,
     )
     console.print(panel)
@@ -284,6 +240,7 @@ def main() -> None:
 
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     manifest_data: Dict[str, Any] = {}
     for repo_id, meta in MODEL_REGISTRY.items():
         result = hydrate_model(repo_id, meta, precision=precision_choice, force=args.force)
@@ -293,12 +250,14 @@ def main() -> None:
         json.dump(manifest_data, f, indent=2)
 
     console.print(f"\nHydration Manifest written to: [yellow]{MANIFEST_PATH}[/yellow]")
+
     table = Table(title="Model Hydration Status", expand=True)
     table.add_column("Repository ID", style="cyan")
     table.add_column("Type", style="magenta", justify="center")
     table.add_column("Precision", style="yellow", justify="center")
     table.add_column("Status", style="green", justify="center")
     table.add_column("Local Path", style="dim")
+
     for repo_id, info in manifest_data.items():
         table.add_row(
             repo_id,
