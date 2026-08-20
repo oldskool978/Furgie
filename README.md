@@ -7,33 +7,33 @@
 
 **Furgie V2** is a filterless, vocoder-free audio super-resolution and spectral restoration engine operating in the complex Short-Time Fourier Transform (STFT) domain. It extends band-limited audio (8 kHz, 12 kHz, 16 kHz, 24 kHz) up to a full **48.0 kHz 32-bit Float PCM master** using Continuous Normalizing Flows (Flow Matching ODEs).
 
-Passbands are preserved bit-for-bit in the complex domain, while missing harmonic overtones (up to 24.0 kHz) are inpainted through deterministic 2nd-order Runge-Kutta numerical trajectories[cite: 3].
+Passbands are preserved bit-for-bit in the complex domain, while missing harmonic overtones (up to 24.0 kHz) are inpainted through deterministic 2nd-order Runge-Kutta numerical trajectories.
 
 ---
 
 ## Core Technical Innovations
 
-* **Complex STFT Flow Matching**: Operates directly on power-compressed complex spectrograms ($|X|^{0.2} e^{j\angle X}$), bypassing neural vocoder artifacts, phase smearing, and transient degradation[cite: 3].
-* **Bit-Exact Passband Splicing**: Original low-frequency complex bins ($0 - 12.0\text{ kHz}$) are joined with generated upper bands ($12.0 - 24.0\text{ kHz}$) via direct frequency concatenation, eliminating crossover phase distortion and comb filtering[cite: 3].
-* **Partition of Unity Overlap-Add (OLA)**: Bounded-memory continuous streaming via squared-cosine transitions ($\sin^2\theta + \cos^2\theta = 1.0$) with exact linear accumulation normalization[cite: 3].
-* **Native SafeTensors Integration**: Direct zero-overhead memory mapping with verified [SafeTensors weights on Hugging Face](https://huggingface.co/OLDSKOOL978/universr-audio), completely eliminating unsafe pickle deserialization[cite: 3].
-* **ITU-R BS.1770 True-Peak Lossless Gain Staging**: Integrated $4\times$ sinc-oversampled True-Peak metering and dynamic headroom scaling with optional strict ceiling limits[cite: 3].
-* **Dual Master Delivery**: Native support for independent $48.0\text{ kHz}$ and polyphase sinc-decimated $44.1\text{ kHz}$ master outputs[cite: 3].
+* **Complex STFT Flow Matching**: Operates directly on power-compressed complex spectrograms ($|X|^{0.2} e^{j\angle X}$), bypassing neural vocoder artifacts, phase smearing, and transient degradation.
+* **Bit-Exact Passband Splicing**: Original low-frequency complex bins ($0 - 12.0\text{ kHz}$) are joined with generated upper bands ($12.0 - 24.0\text{ kHz}$) via direct frequency concatenation, eliminating crossover phase distortion and comb filtering.
+* **Partition of Unity Overlap-Add (OLA)**: Bounded-memory continuous streaming via squared-cosine transitions ($\sin^2\theta + \cos^2\theta = 1.0$) with exact linear accumulation normalization.
+* **Native SafeTensors Integration**: Direct zero-overhead memory mapping with verified [SafeTensors weights on Hugging Face](https://huggingface.co/OLDSKOOL978/universr-audio), completely eliminating unsafe pickle deserialization.
+* **ITU-R BS.1770 True-Peak Lossless Gain Staging**: Integrated $4\times$ sinc-oversampled True-Peak metering and dynamic headroom scaling with optional strict ceiling limits.
+* **Dual Master Delivery**: Native support for independent $48.0\text{ kHz}$ and polyphase sinc-decimated $44.1\text{ kHz}$ master outputs.
 
 ---
 
 ## Optimal Architecture Baseline
 
-Extensive empirical convergence profiling establishes the following canonical default configuration[cite: 3]:
+Extensive empirical convergence profiling establishes the following canonical default configuration:
 
 | Stage | Parameter | Default Value | Description |
 | :--- | :--- | :--- | :--- |
-| **Stage 1** | Target Delivery Mode | `48k` | 48.0 kHz Master Only (32-bit Float PCM)[cite: 3] |
-| **Stage 2** | ODE Solver | `midpoint` | 2nd-Order Midpoint Runge-Kutta (RK2)[cite: 3] |
-| **Stage 2** | Integration Steps | `16` | Symplectic time steps ($O(\Delta t^2)$ convergence)[cite: 3] |
-| **Stage 2** | Guidance Scale ($w$) | `0.00` | Pure conditional trajectory (halves compute per step)[cite: 3] |
-| **Stage 2** | Conditioning Anchor | `24000` Hz | Harmonic Inpainting split: 12.0 kHz to 24.0 kHz[cite: 3] |
-| **Stage 3** | Headroom Mode | `bypass` | Passband Bit-Exact Unity ($1.0\times$ linear scalar)[cite: 3] |
+| **Stage 1** | Target Delivery Mode | `48k` | 48.0 kHz Master Only (32-bit Float PCM) |
+| **Stage 2** | ODE Solver | `midpoint` | 2nd-Order Midpoint Runge-Kutta (RK2) |
+| **Stage 2** | Integration Steps | `16` | Symplectic time steps ($O(\Delta t^2)$ convergence) |
+| **Stage 2** | Guidance Scale ($w$) | `0.00` | Pure conditional trajectory (halves compute per step) |
+| **Stage 2** | Conditioning Anchor | `24000` Hz | Harmonic Inpainting split: 12.0 kHz to 24.0 kHz |
+| **Stage 3** | Headroom Mode | `bypass` | Passband Bit-Exact Unity ($1.0\times$ linear scalar) |
 
 ---
 
@@ -56,7 +56,7 @@ pip install -r requirements.txt
 
 ### 3. Hydrate SafeTensors Weights
 
-Download and verify the official native SafeTensors weights from [Hugging Face](https://huggingface.co/OLDSKOOL978/universr-audio)[cite: 3]:
+Download and verify the official native SafeTensors weights from [Hugging Face](https://huggingface.co/OLDSKOOL978/universr-audio):
 
 ```bash
 python scripts/hydrate_models.py
@@ -68,7 +68,7 @@ python scripts/hydrate_models.py
 
 ### Interactive Audio Restoration Harness
 
-Launch the interactive terminal interface for parameter mutation, file processing, and acoustic telemetry analysis[cite: 3]:
+Launch the interactive terminal interface for parameter mutation, file processing, and acoustic telemetry analysis:
 
 ```bash
 python harness.py
@@ -98,7 +98,7 @@ python harness.py
 
 ### Non-Interactive Batch Execution
 
-Execute deterministic single-command super-resolution passes[cite: 3]:
+Execute deterministic single-command super-resolution passes:
 
 ```bash
 python harness.py --batch --input "workspace/track.wav" --output "workspace/output/master_48k.wav" --steps 16 --solver midpoint --cfg 0.0 --anchor 24000 --headroom-mode bypass
@@ -106,22 +106,22 @@ python harness.py --batch --input "workspace/track.wav" --output "workspace/outp
 
 ### REST API Service (FastAPI / Uvicorn)
 
-Run the high-throughput asynchronous REST microservice[cite: 3]:
+Run the high-throughput asynchronous REST microservice:
 
 ```bash
 uvicorn api.app:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-#### API Endpoints[cite: 3]:
-* `POST /v1/process/file`: Multipart binary WAV upload with JSON inference config[cite: 3].
-* `POST /v1/process/array`: Direct JSON float32 sample buffer array processing[cite: 3].
-* `GET  /v1/models/status`: Telemetry on hardware acceleration and loaded weights[cite: 3].
+#### API Endpoints:
+* `POST /v1/process/file`: Multipart binary WAV upload with JSON inference config.
+* `POST /v1/process/array`: Direct JSON float32 sample buffer array processing.
+* `GET  /v1/models/status`: Telemetry on hardware acceleration and loaded weights.
 
 ---
 
 ## Python API Integration
 
-Embed Furgie directly into audio processing pipelines[cite: 3]:
+Embed Furgie directly into audio processing pipelines:
 
 ```python
 import torch
@@ -157,7 +157,7 @@ print(f"True Peak: {telemetry.true_peak_dbtp:.2f} dBTP | Crest Factor: {telemetr
 
 ## Telemetry & Quality Metrics
 
-Every execution generates a comprehensive Acoustic Telemetry Report detailing dynamics, peak measurements, and latency metrics[cite: 3]:
+Every execution generates a comprehensive Acoustic Telemetry Report detailing dynamics, peak measurements, and latency metrics:
 
 ```text
 ====================================================================================
@@ -191,30 +191,30 @@ Linear Gain Scalar:      1.000000 (0.00 dB)
 
 ```text
 Furgie/
-├── api/                             # FastAPI microservice endpoints & Pydantic schemas[cite: 3]
+├── api/                             # FastAPI microservice endpoints & Pydantic schemas
 │   ├── app.py
 │   ├── endpoints.py
 │   └── schemas.py
-├── furgie_core/                     # Core computational & neural graph engine[cite: 3]
-│   ├── arch/                        # PyTorch model definitions & ODE solvers[cite: 3]
+├── furgie_core/                     # Core computational & neural graph engine
+│   ├── arch/                        # PyTorch model definitions & ODE solvers
 │   │   ├── model.py
 │   │   ├── solver.py
 │   │   ├── spectral_ops.py
 │   │   └── universr.py
-│   ├── config/                      # Inference configuration profiles[cite: 3]
+│   ├── config/                      # Inference configuration profiles
 │   │   └── inference/
 │   │       └── Furgie_Convergent_48k.yaml
-│   ├── dsp_cuda.py                  # CUDA/C++ accelerated DSP, OLA windows, True-Peak[cite: 3]
-│   ├── engine.py                    # Top-level Furgie orchestration engine[cite: 3]
-│   ├── network_wrapper.py           # Tiled inference and state manager[cite: 3]
-│   └── schema.py                    # Structured dataclasses and serialization[cite: 3]
-├── scripts/                         # Automation & model hydration scripts[cite: 3]
+│   ├── dsp_cuda.py                  # CUDA/C++ accelerated DSP, OLA windows, True-Peak
+│   ├── engine.py                    # Top-level Furgie orchestration engine
+│   ├── network_wrapper.py           # Tiled inference and state manager
+│   └── schema.py                    # Structured dataclasses and serialization
+├── scripts/                         # Automation & model hydration scripts
 │   ├── hydrate_models.py
 │   └── hydrated_models_manifest.json
-├── weights/                         # Local SafeTensors weight repository[cite: 3]
-├── workspace/                       # Default staging workspace for I/O[cite: 3]
-├── harness.py                       # Interactive & CLI super-resolution harness[cite: 3]
-├── requirements.txt                 # Production dependencies[cite: 3]
+├── weights/                         # Local SafeTensors weight repository
+├── workspace/                       # Default staging workspace for I/O
+├── harness.py                       # Interactive & CLI super-resolution harness
+├── requirements.txt                 # Production dependencies
 └── README.md
 ```
 
