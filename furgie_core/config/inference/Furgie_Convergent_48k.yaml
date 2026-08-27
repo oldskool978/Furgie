@@ -27,7 +27,12 @@ model:
 universr_flow_core:
   enabled: true
   repo_id: OLDSKOOL978/universr-audio
-  solver: midpoint
+  solver: heun
   ode_steps: 16
   guidance_scale: 0.0
+  scheduler_type: uniform
+  time_warp_gamma: 1.0
+  seed: 42
+  cross_band_gain_match: true
+  crossover_blend_bins: 0
   input_sr_anchor: 24000
